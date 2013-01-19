@@ -11,7 +11,7 @@
 #include <QMap>
 #include <QMessageBox>
 #include <QDebug>
-#include "../Sessions/Session.h"
+#include "../sessions/Session.h"
 #include "SessCreateForm.h"
 #include "FMgr.h"
 #include "SessionsTableViewDelegate.h"

@@ -5,36 +5,28 @@
 #include <QObject>
 #include <QVector>
 #include <QThread>
-#include "../interfaces/ISSHChannel.h"
-#include "../common.h"
-#include <stdio.h>
 #include <QTimer>
 #include <QVectorIterator>
-#include "../sessions/Session.h"
+#include <stdio.h>
+
 
 
 #include <libssh2.h>
 #include <libssh2_sftp.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdio.h>
+#include <ctype.h>
 
-#include "ls_channel.h"
-#include "get_channel.h"
 
-#ifdef HAVE_WINSOCK2_H
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <winsock2.h>
-#endif
-#ifdef HAVE_SYS_SOCKET_H
+#else
 #include <sys/socket.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
-#endif
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
-#ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
-#endif
-#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 
@@ -54,6 +46,13 @@
 #ifndef PRIu64
 #define PRIu64 __PRI64_PREFIX "u"
 #endif
+
+#include "../interfaces/ISSHChannel.h"
+#include "../common.h"
+#include "../sessions/Session.h"
+#include "ls_channel.h"
+#include "get_channel.h"
+
 
 class SSHSession : public QObject {
     Q_OBJECT

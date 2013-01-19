@@ -11,22 +11,28 @@ SSHSession::SSHSession(Session* session) : CHANNELS(8, NULL){
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(process()));
 
-
     this->sock = socket(AF_INET, SOCK_STREAM, 0);
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
     if(this->sock == INVALID_SOCKET){
-        //int errcode = WSAGetLastError();
+        int errcode = WSAGetLastError();
         WSACleanup();
         return;
     }
-
-    //Setting socket I/O mode to non-blocking
-    u_long arg = 1;
-    int errorcode = ioctlsocket(this->sock, FIONBIO, &arg);
-    qDebug() << errorcode;
-    if(errorcode != NO_ERROR){
+#else
+    if(this->sock == -1){
+       return;
     }
+#endif
+
+ //Setting socket I/O mode to non-blocking
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+    u_long arg = 1;
+    ioctlsocket(this->sock, FIONBIO, &arg);
+#else
+    int flags = fcntl(this->sock, F_GETFL, 0);
+    int a = fcntl(this->sock, F_SETFL, flags | O_NONBLOCK);
+    qDebug() << a;
 #endif
 
     this->addr.sin_family = AF_INET;
@@ -47,19 +53,23 @@ SSH_SESSION_STATE SSHSession::begin_session(){
     if(this->state == ::SESSION_PERFORM_CONNECT || this->state == ::SESSION_CLOSED){
 
         int ret = ::connect(this->sock, (struct sockaddr*)(&this->addr), sizeof(struct sockaddr_in));
-        int ec = WSAGetLastError();
 
-        //Blocking ?
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+        int ec = WSAGetLastError();
         if(ret == SOCKET_ERROR &&  ec == WSAEWOULDBLOCK) {
             this->state = ::SESSION_SELECT_SOCKET;
-
+         }
+#else
+    if(ret == -1 &&  errno == EINPROGRESS) {
+           this->state = ::SESSION_SELECT_SOCKET;
+    }
+#endif
         //Success (will most likely never happen) ?
-        }else if(ret == 0){
+        else if(ret == 0){
             this->state = ::SESSION_PERFORM_INIT;
 
         //Major error
         } else{
-            WSACleanup();
             this->running_procs--;
             this->state = ::SESSION_OPEN_ERROR;
         }
@@ -69,7 +79,11 @@ SSH_SESSION_STATE SSHSession::begin_session(){
     }else if(this->state == ::SESSION_SELECT_SOCKET){
 
         fd_set fd_write, fd_error;
-        TIMEVAL timeout;
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+         TIMEVAL timeout;
+#else
+        struct timeval timeout;
+#endif
         // timeout after 10 seconds
         int timeoutSec = 10;
 
@@ -81,7 +95,12 @@ SSH_SESSION_STATE SSHSession::begin_session(){
         timeout.tv_sec = timeoutSec;
         timeout.tv_usec = 0;
 
-        int ret = select(0, NULL, &fd_write, &fd_error, &timeout);
+
+#if defined( WIN32 ) || defined( _WIN32 ) || defined( __WIN32 ) && !defined( __CYGWIN__ )
+        int ret = select( 0, NULL, &fd_write, &fd_error, &timeout );
+#else
+        int ret = select( this->sock + 1, NULL, &fd_write, &fd_error, &timeout );
+#endif
 
         //Timed out ?
         if(ret == 0) {

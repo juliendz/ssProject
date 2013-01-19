@@ -8,7 +8,7 @@
 #define	_SESSCREATEFORM_H
 
 #include "ui_SessCreateForm.h"
-#include "../Sessions/SessionManager.h"
+#include "../sessions/SessionManager.h"
 
 class SessCreateForm : public QWidget {
     

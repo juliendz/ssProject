@@ -44,5 +44,10 @@ FORMS += \
     src/ui/MainWindow.ui \
     src/ui/FMgr.ui
 
-LIBS += -lws2_32 \
-        -llibssh2
+win32:LIBS += -lws2_32 \
+	      -llibssh2
+
+unix:!macx:!symbian: LIBS += -L$$PWD/../../../../../usr/lib/ -lssh2
+
+INCLUDEPATH += $$PWD/../../../../../usr/include
+DEPENDPATH += $$PWD/../../../../../usr/include
