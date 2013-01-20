@@ -22,7 +22,8 @@ SOURCES += \
     src/ui/SessCreateForm.cpp \
     src/ui/MainWindow.cpp \
     src/ui/FMgr.cpp \
-    src/logger.cpp
+    src/logger.cpp \
+    src/net/put_channel.cpp
 
 HEADERS  += \
     src/common.h \
@@ -37,7 +38,8 @@ HEADERS  += \
     src/ui/SessCreateForm.h \
     src/ui/MainWindow.h \
     src/ui/FMgr.h \
-    src/logger.h
+    src/logger.h \
+    src/net/put_channel.h
 
 FORMS += \
     src/ui/SessCreateForm.ui \

@@ -1,28 +1,16 @@
-#include "get_channel.h"
+#include "put_channel.h"
 
-GET_Channel::GET_Channel(SSHSession *session){
-
-    this->is_open= false;
-    this->session = session;
-
-    this->ssh_session = session->getSessionObject();
-    this->channel = 0;
-    this->handle = 0;
-
-    this->file = new QFile();
-
+PUT_Channel::PUT_Channel ( SSHSession *session )  {
 
 }
 
-GET_Channel::~GET_Channel(){
-    delete this->file;
+
+PUT_Channel::~PUT_Channel( ){
 }
 
-SSH_CHANNEL_STATE GET_Channel::open_channel(){
-
-    this->channel = libssh2_sftp_init(this->ssh_session);
-
-    if ((!this->channel) && (libssh2_session_last_errno(this->ssh_session) !=  LIBSSH2_ERROR_EAGAIN)) {
+SSH_CHANNEL_STATE PUT_Channel::open_channel() {
+    this->channel = libssh2_sftp_init( this->ssh_session );
+    if (( !this->channel ) && ( libssh2_session_last_errno( this->ssh_session ) !=  LIBSSH2_ERROR_EAGAIN )) {
         this->is_open = false;
         this->state = ::CHANNEL_OPEN_ERROR;
     }else if(this->channel){
@@ -32,22 +20,22 @@ SSH_CHANNEL_STATE GET_Channel::open_channel(){
         this->is_open = false;
         this->state =  ::CHANNEL_OPENING;
      }
-
     return this->state;
 }
 
-SSH_CHANNEL_STATE GET_Channel::close_channel(){
-
-    libssh2_sftp_shutdown(this->channel);
+SSH_CHANNEL_STATE PUT_Channel::close_channel ( ) {
+    libssh2_sftp_shutdown( this->channel );
     this->state =  ::CHANNEL_CLOSED;
     return this->state;
 }
 
 
+SSH_CHANNEL_STATE PUT_Channel::perform_operation ( ) {
 
-SSH_CHANNEL_STATE GET_Channel::perform_operation(){
-    //If its a folder create it locally
+    /*
+    //If its a folder create it remotely
     if(this->currentNode->type == 1){
+        //this->handle = libssh2_sftp_mkdir(this->channel, this->currentRemotePath + this->currentNode-.toUtf8().constData(),   LIBSSH2_FXF_READ, 0);
         QDir dir(this->currentLocalPath + "/" + this->currentNode->name);
         if(!dir.exists()){
             dir.mkdir(this->currentLocalPath + "/" + this->currentNode->name);
@@ -95,5 +83,5 @@ SSH_CHANNEL_STATE GET_Channel::perform_operation(){
    }
 
     return this->state;
-
+*/
 }

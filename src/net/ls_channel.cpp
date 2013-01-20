@@ -161,24 +161,17 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
                 this->state = ::CHANNEL_OPERATION_INPROGRESS;
                 return this->state;
             }
-
-
-
             this->handle = libssh2_sftp_opendir(this->channel, this->currentPath.toUtf8().constData());
-
             if((!this->handle) && (libssh2_session_last_errno(this->ssh_session) != LIBSSH2_ERROR_EAGAIN)) {
                         fprintf(stderr, "Unable to open dir with SFTP\n");
                         this->state = ::CHANNEL_OPERATION_ERROR;
                         return this->state;
              }
-
             if(!this->handle){
                 this->state = ::CHANNEL_OPERATION_INPROGRESS;
                 return this->state;
             }
         }
-
-
         //Parse the directory listing
         int rc = 0;
         char mem[512];
@@ -245,11 +238,44 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
             }
 
         }
-
-
-    }
-
-
+}
     return this->state;
 
+}
+
+void LS_Channel::put_ls( ) {
+        Node_ex* temp_node = this->LISTING_Ex->at(this->list_counter);        			//Get the next node in the lis
+        if( temp_node->type == 1 ) { 										//is Folder
+            this->currentPath = temp_node->absPath;
+        }else{ 				   										// is File
+            this->list_counter++;
+            this->state = ::CHANNEL_OPERATION_INPROGRESS;
+            return;
+        }
+        QDir dir(this->currentPath);
+        QFileInfoList nodes =  dir.entryInfoList( QDir::NoDotAndDotDot | QDir::AllEntries );
+        foreach ( QFileInfo n, nodes ){
+
+                QString name = n.fileName();
+                Node_ex* node = new Node_ex();
+                if( n.isDir( ) ){
+                    node->type = 1;
+                }else if( n.isSymLink( ) ){
+                        node->type = 2;
+                }else{
+                        node->type = 0;
+                }
+                node->size = n.size( );
+                node->name = name;
+                node->absPath = currentPath + "/" + name ;
+                this->LISTING_Ex->insert( this->list_counter+1, node );
+                this->state = ::CHANNEL_OPERATION_INPROGRESS;
+        }
+        this->list_counter++;
+        if(this->list_counter < this->LISTING_Ex->count()){
+                this->state = ::CHANNEL_OPERATION_INPROGRESS;
+        }else{
+                this->state = ::CHANNEL_OPERATION_DONE;
+                this->session->emit_readyToSendFileListing( this->LISTING_Ex );
+        }
 }

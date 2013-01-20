@@ -64,6 +64,12 @@ enum SSH_CHANNEL_STATE{
     CHANNEL_INTERNAL_OPERATION_DONE
 };
 
+enum SSH_LS_OPERATION{
+    LS,
+        GET_LS,
+        PUT_LS
+};
+
 
 
 

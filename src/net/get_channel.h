@@ -24,7 +24,6 @@ public:
     Node_ex* currentNode;
     QString currentLocalPath;
     
-signals:
 
 private:
     SSHSession* session;

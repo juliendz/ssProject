@@ -10,37 +10,35 @@
 #include "../common.h"
 #include <QDebug>
 #include <QFile>
+#include <QDir>
+#include <QFileInfo>
 
 class SSHSession;
 
 
-class LS_Channel : public ISSHChannel
-{
+class LS_Channel : public ISSHChannel {
     Q_OBJECT
 public:
-    explicit LS_Channel(SSHSession* session);
-    
-
+    explicit LS_Channel( SSHSession* session );
 public:
-    SSH_CHANNEL_STATE open_channel();
-    SSH_CHANNEL_STATE close_channel();
-    SSH_CHANNEL_STATE perform_operation();
-    QString m_path;
-    QList<QString>* m_PATHS;
-    int list_counter;
-    QString currentPath;
-    QList<Node*>* LISTING;
-    Node_ex_List *LISTING_Ex;
+    SSH_CHANNEL_STATE 		open_channel();
+    SSH_CHANNEL_STATE 		close_channel();
+    SSH_CHANNEL_STATE 		perform_operation();
 
-
+    QString				        m_path;
+    QList<QString>			*m_PATHS;
+    int 					list_counter;
+    QString 					currentPath;
+    QList<Node*>			*LISTING;
+    Node_ex_List 				*LISTING_Ex;
+    SSH_LS_OPERATION		optype;
 private:
+    void put_ls();
 
-
-private:
-    SSHSession* session;
-    LIBSSH2_SESSION *ssh_session;
-    LIBSSH2_SFTP *channel;
-    LIBSSH2_SFTP_HANDLE *handle;
+    SSHSession				*session;
+    LIBSSH2_SESSION 			*ssh_session;
+    LIBSSH2_SFTP 			*channel;
+    LIBSSH2_SFTP_HANDLE 		*handle;
 
 
 };

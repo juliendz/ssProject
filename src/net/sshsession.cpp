@@ -1,6 +1,6 @@
 #include "sshsession.h"
 
-SSHSession::SSHSession(Session* session) : CHANNELS(8, NULL){
+SSHSession::SSHSession( Session* session ) : CHANNELS( 8, NULL ){
 
     this->hostname = session->hostname;
     this->username = session->username;
@@ -252,7 +252,7 @@ void SSHSession::sftp_ls(QString path){
 
 }
 
-void SSHSession::sftp_ls_ex(Node_ex_List *FILES){
+void SSHSession::sftp_get_ls(Node_ex_List *FILES){
 
     int prev_running_procs = this->running_procs;
 
@@ -288,13 +288,38 @@ void SSHSession::sftp_ls_ex(Node_ex_List *FILES){
 
 }
 
-void SSHSession::sftp_get(Node_ex *file, QString currentPath){
+void SSHSession::sftp_put_ls( Node_ex_List *FILES ){
+        int prev_running_procs = this->running_procs;
+        LS_Channel *channel = ( LS_Channel* )this->CHANNELS[ 0 ];
+        if ( !channel ) {										//Is it instantiated ?
+                channel = new LS_Channel(this);
+                channel->state = ::CHANNEL_OPENING;
+        } else if ( channel->state == ::CHANNEL_CLOSED ) { 			//Is it closed ?
+                channel->state = ::CHANNEL_OPENING;
+        } else if ( channel->state == ::CHANNEL_IDLE ) {     			//Is it idle ?
+                channel->state = ::CHANNEL_OPERATION_INPROGRESS;
+        }
+        //Set the request path
+        channel->LISTING_Ex = FILES;
+        channel->list_counter = 0;
+        channel->optype = ::PUT_LS;
+        channel->m_path = "";
+        this->CHANNELS[0] = channel;
+        this->running_procs++;
+        if( prev_running_procs <= 0 ) {							//Call process() only if no previously running processes
+                this->timer->start(0);
+                fprintf(stderr, "TIMER STARTED\n");
+        }
+}
+
+
+void SSHSession::sftp_get(Node_ex *file, QString currentLocalPath){
 
     int prev_running_procs = this->running_procs;
     GET_Channel *channel = 0;
     int channel_index;
 
-    //2-6 to be used for downloads
+    //2-5 to be used for downloads
     for(int i=2; i < 6; i++){
         if(!this->CHANNELS[i] || !this->CHANNELS[i]->is_open){
             channel = (GET_Channel*)this->CHANNELS[i];
@@ -320,7 +345,7 @@ void SSHSession::sftp_get(Node_ex *file, QString currentPath){
 
     //Set the request path
     channel->currentNode = file;
-    channel->currentLocalPath = currentPath;
+    channel->currentLocalPath = currentLocalPath;
 
     this->CHANNELS[channel_index] = channel;
     this->running_procs++;
@@ -331,6 +356,35 @@ void SSHSession::sftp_get(Node_ex *file, QString currentPath){
         fprintf(stderr, "TIMER STARTED\n");
     }
 
+}
+
+void SSHSession::sftp_put(Node_ex *file, QString currentRemotePath){
+        int prev_running_procs = this->running_procs;
+        GET_Channel *channel = 0;
+        int channel_index;
+        for ( int i=6; i<9; i++ ) {								//6-9 to be used for uploads
+                if ( !this->CHANNELS[i] || !this->CHANNELS[i]->is_open ) {
+			channel = (GET_Channel*)this->CHANNELS[i];
+                	channel_index = i;
+                    	break;
+                }
+        }
+        if ( !channel ) {										//Is it instantiated ?
+        	channel = new GET_Channel(this);
+        	channel->state = ::CHANNEL_OPENING;
+        }else if ( channel->state == ::CHANNEL_CLOSED ) {			//Is it closed ?
+        	channel->state = ::CHANNEL_OPENING;
+        } else if ( channel->state == ::CHANNEL_IDLE ) {				//Is it idle ?
+        	channel->state = ::CHANNEL_OPERATION_INPROGRESS;
+    	}
+        channel->currentNode = file;							//Set the request path
+        channel->currentLocalPath = currentRemotePath;
+        this->CHANNELS[channel_index] = channel;
+        this->running_procs++;
+        if(prev_running_procs <= 0){							//Call process() only if no previously running processes
+            this->timer->start(0);
+            fprintf(stderr, "TIMER STARTED\n");
+        }
 }
 
 LIBSSH2_SESSION *SSHSession::getSessionObject() {
@@ -403,4 +457,9 @@ void SSHSession::emit_receivedFileListing(QList<Node *> *LISTING){
 //Wrapper function to emit signal
 void SSHSession::emit_receivedFileListing_ex(Node_ex_List *LISTING){
     emit this->receivedFileListing_ex(LISTING);
+}
+
+//Wrapper function to emit signal
+void SSHSession::emit_readyToSendFileListing( Node_ex_List *LISTING ) {
+    emit this->readyToSendFileListing( LISTING );
 }
