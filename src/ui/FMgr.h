@@ -51,6 +51,9 @@ public slots:
     
     void showLocCtxMenu(const QPoint &);
     void showRemCtxMenu(const QPoint& pos);
+
+signals:
+        void				sg_ls( QString currPath );
     
     
 private:
@@ -74,25 +77,35 @@ private:
     QStandardItemModel* model_uploads;    
     QStandardItemModel* model_downloads;    
     
-    QString currUrl;
     QStringList rem_PATH;
     
     //Queues
     //QQueue<ssFileTreeNode> UPLOADS;
     //QQueue<ssFileTreeNode> DOWNLOADS;
+    QList<Node *> 				*FILES;
     
     void setupTableView();
     void addRow();
-    void call_connect();
-	void create_worker_thread();
-	void destroy_worker_thread();
     
-    QString add_to_rem_path(QString path);
-    QString rem_from_rem_path();
-    QString get_curr_rem_path();
-    
-    QString get_curr_loc_path();
-    //void traverseJobTree(ssNode *fileNode);
+        inline void add_to_rem_path( QString dir ) {
+                this->rem_PATH.append( dir );
+                this->FILES->clear( );
+        }
+
+        inline void  rem_path_one_up( ) {
+                if ( !this->rem_PATH.isEmpty( ) ) {
+                        this->rem_PATH.removeLast( );
+                        this->FILES->clear( );
+                }
+        }
+
+        inline QString get_curr_rem_path( ) {
+                return "/" + this->rem_PATH.join( "/" ) + "/";
+        }
+
+        QString get_curr_loc_path();
+
+
     
 
 };

@@ -128,7 +128,11 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
             //PATH
             node->absPath = this->m_path +  node->name ;
 
-            this->LISTING->append(node);
+        if(node->name == "." || node->name == "..") {
+                this->LISTING->insert ( 0, node );
+        }else{
+                this->LISTING->append(node);
+        }
 
 
         }else if(rc == LIBSSH2_ERROR_EAGAIN) {

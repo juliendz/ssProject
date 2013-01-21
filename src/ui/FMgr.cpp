@@ -7,27 +7,33 @@
 #include "FMgr.h"
 #include <QMessageBox>
 
-FMgr::FMgr(Session* sess) {
-    
-    widget.setupUi(this);
+FMgr::FMgr( Session* sess ) {
+        widget.setupUi(this);
 	this->widget.tabWidget_Main->setCurrentIndex(0);
 
-    this->session = sess;
-    this->rem_PATH.append(sess->initpath);
-    this->widget.txtBox_remotepath->setText(this->get_curr_rem_path());
+        this->session = sess;
+        this->rem_PATH = sess->initpath.split( "/" , QString::SkipEmptyParts );
+        this->widget.txtBox_remotepath->setText(this->get_curr_rem_path());
 
-    setupTableView();
+        setupTableView();
 
-    //tableview item dclick signal/slot
-    connect(this->widget.tableView_remote, SIGNAL(doubleClicked(const QModelIndex&)), this, SLOT(eh_rem_tableViewItemDoubleClicked(const QModelIndex&)));
-    connect(this->widget.tableView_local, SIGNAL(doubleClicked(const QModelIndex&)), this, SLOT(eh_loc_tableViewItemDoubleClicked(const QModelIndex&)));
-    connect(this->widget.comboBox_drives, SIGNAL(currentIndexChanged(QString)), this, SLOT(eh_loc_drives_cbox_changed(QString)));
-    
-    connect(this->widget.tableView_local, SIGNAL(customContextMenuRequested(const QPoint &)), this, SLOT(showLocCtxMenu(const QPoint &)));
-    connect(this->widget.tableView_remote, SIGNAL(customContextMenuRequested(const QPoint &)), this, SLOT(showRemCtxMenu(const QPoint &)));
+        //tableview item dclick signal/slot
+        connect(this->widget.tableView_local, SIGNAL(doubleClicked(const QModelIndex&)), this, SLOT(eh_loc_tableViewItemDoubleClicked(const QModelIndex&)));
+        connect(this->widget.tableView_local, SIGNAL(customContextMenuRequested(const QPoint &)), this, SLOT(showLocCtxMenu(const QPoint &)));
 
-	this->create_worker_thread();
- 
+        connect(this->widget.tableView_remote, SIGNAL(doubleClicked(const QModelIndex&)), this, SLOT(eh_rem_tableViewItemDoubleClicked(const QModelIndex&)));
+        connect(this->widget.tableView_remote, SIGNAL(customContextMenuRequested(const QPoint &)), this, SLOT(showRemCtxMenu(const QPoint &)));
+
+        connect(this->widget.comboBox_drives, SIGNAL(currentIndexChanged(QString)), this, SLOT(eh_loc_drives_cbox_changed(QString)));
+
+
+        this->sshsession = new SSHSession( this->session );	//Create the ssh session object
+        connect( this, SIGNAL( sg_ls( QString ) ), this->sshsession, SLOT( sftp_ls( QString ) ) );
+        connect( this->sshsession, SIGNAL( receivedFileListing( QList<Node*>* ) ), this, SLOT( eh_fileListReceived( QList<Node*>* ) ) );
+        connect( this->sshsession, SIGNAL( receivedFileListing_ex( Node_ex_List* ) ), this, SLOT( eh_fileListReceived_ex(Node_ex_List*) ) );
+
+
+        emit this->sg_ls ( this->get_curr_rem_path ( ) );
 }
 
 
@@ -63,8 +69,8 @@ void FMgr::setupTableView(){
     model_remote->setHorizontalHeaderItem(0, new QStandardItem(QString("Filename")));
     model_remote->setHorizontalHeaderItem(1, new QStandardItem(QString("Filesize")));
     model_remote->setHorizontalHeaderItem(2, new QStandardItem(QString("Filetype")));
-    model_remote->setHorizontalHeaderItem(3, new QStandardItem(QString("Date")));
-    model_remote->setHorizontalHeaderItem(4, new QStandardItem(QString("Time")));
+    model_remote->setHorizontalHeaderItem(3, new QStandardItem(QString("Access Time")));
+    model_remote->setHorizontalHeaderItem(4, new QStandardItem(QString("Modified Time")));
     model_remote->setHorizontalHeaderItem(5, new QStandardItem(QString("Permissions")));
     this->widget.tableView_remote->setModel(model_remote);
 
@@ -88,54 +94,6 @@ void FMgr::setupTableView(){
     model_downloads->setHorizontalHeaderItem(4, new QStandardItem(QString("Progress")));
 	this->widget.tableView_downloads->setModel(model_downloads);
    
-}
-
-void FMgr::create_worker_thread(){
-
-    //Create the worker thread object (QThread)
-    //this->worker = new ssWorker();
-
-    //Create the ssh session object
-    this->sshsession = new SSHSession(this->session);
-
-    //Connections
-    connect(this->sshsession, SIGNAL(receivedFileListing(QList<Node*>*)), this, SLOT(eh_fileListReceived(QList<Node*>*)));
-    connect(this->sshsession, SIGNAL(receivedFileListing_ex(Node_ex_List*)), this, SLOT(eh_fileListReceived_ex(Node_ex_List*)));
-
-    //Move the transfer manager object onto the new worker thread
-    //this->sshsession->moveToThread(this->worker);
-
-    //Start the worker thread event loop
-    //this->worker->start();
-    
-    this->call_connect();
-
-}
-
-void FMgr::destroy_worker_thread(){
-
-}
-
-void FMgr::call_connect(){
-    //QMetaObject::invokeMethod(this->sshsession, "sftp_ls", Q_ARG(QString, this->get_curr_rem_path()));
-    this->sshsession->sftp_ls(this->get_curr_rem_path());
-}
-
-
-QString FMgr::add_to_rem_path(QString path){
-    
-    this->rem_PATH.append(path+"/");
-    return this->get_curr_rem_path();
-}
-
-QString FMgr::rem_from_rem_path(){
-    
-    this->rem_PATH.removeLast();
-    return this->get_curr_rem_path();
-}
-
-QString FMgr::get_curr_rem_path(){
-    return this->rem_PATH.join("");
 }
 
 void FMgr::showLocCtxMenu(const QPoint& pos){
@@ -215,24 +173,19 @@ void FMgr::eh_fileUploaded(Node *file){
 */
 }
 
-void FMgr::eh_fileListReceived(QList<Node *> *FILES){
-
-    //Update the model for the view
-    QList<Node*>::iterator iter;
-    
-    for(iter = FILES->begin(); iter != FILES->end(); iter++) {
-        
-        QList<QStandardItem*> items;
-        items.append(new QStandardItem(QString((*iter)->name)));
-        items.append(new QStandardItem(QString::number((*iter)->size)));
-        items.append(new QStandardItem(""));
-        items.append(new QStandardItem(""));
-        items.append(new QStandardItem(""));
-        items.append(new QStandardItem(QString((*iter)->perms)));
-        this->model_remote->appendRow(items);
-    }
-
-
+void FMgr::eh_fileListReceived( QList<Node *> *FILES ) {
+        this->FILES = FILES;
+        QList<Node*>::iterator iter;
+        for ( iter = FILES->begin(); iter != FILES->end(); iter++ ) {    				//Update the model for the view
+                QList<QStandardItem*> items;
+                items.append( new QStandardItem( QString((*iter)->name) ) );
+                items.append( new QStandardItem( QString::number((*iter)->size) ) );
+                items.append( new QStandardItem( ( (*iter)->type == 0 ? "File" : ( (*iter)->type == 1 ? "Folder" : "Symlink" ) ) ) );
+                items.append( new QStandardItem( (*iter)->atime ) );
+                items.append( new QStandardItem( (*iter)->atime) );
+                items.append( new QStandardItem( QString( (*iter)->perms) ) );
+                this->model_remote->appendRow( items );
+        }
 }
 
 void FMgr::eh_fileListReceived_ex(Node_ex_List *FILES){
@@ -288,41 +241,33 @@ void FMgr::eh_loc_tableViewItemDoubleClicked(const QModelIndex& index){
     }
 }
 
-void FMgr::eh_rem_tableViewItemDoubleClicked(const QModelIndex& index){
+void FMgr::eh_rem_tableViewItemDoubleClicked( const QModelIndex& index ) {
+        QModelIndex ind(index.model( )->index (index.row(), 0, index.parent( ) ) );			//Get the index of the selected row's first column
+        QString node_name = ind.data( ).toString( );									//Get the value in the name column
 
-    //Get the clicked column
-    QMap<int, QVariant> data = this->model_remote->itemData(index);
-    QString foldername = data[0].toString();
-    
-    //Get the sibling column from the row
-    data = this->model_remote->itemData(index.sibling(index.row(), 5));
-    QString perms = data[0].toString();
-    
-    
-    if(foldername != ".."){
-        
-        if(perms.startsWith("d")){                
-            
-            this->currUrl = this->add_to_rem_path(foldername);
-            this->widget.txtBox_remotepath->setText(this->currUrl);                
+        if(node_name != ".."){
+                Node* node = this->FILES->at(index.row ( ) );							//Get the selected node from the data model based on row
+                if ( node->type == 1) {                                 							//Is folder ?
+                        this->add_to_rem_path( node->name );
+                        this->widget.txtBox_remotepath->setText( this->get_curr_rem_path ( ) );
+                        this->model_remote->removeRows(0, this->model_remote->rowCount()); 	//Clear all table rows
+                        emit this->sg_ls ( this->get_curr_rem_path () );
+                }else{
+                        Node_ex nx;
+                        nx.name = node->name;
+                        nx.absPath = node->absPath;
+                        nx.size = node->size;
+                        nx.type = node->type;
+                        return;
+                }
         }else{
-            
-            QString filename = foldername;
-            //QMetaObject::invokeMethod(this->connection, "ssGET", Q_ARG(QString, filename), Q_ARG(QString, this->currUrl));
-            return;
+                this->rem_path_one_up( );
+                QString newPath = this->get_curr_rem_path( );
+                this->widget.txtBox_remotepath->setText( newPath );
+                this->model_remote->removeRows(0, this->model_remote->rowCount()); 		//Clear all table rows
+                emit this->sg_ls ( newPath );
         }
-        
-    }else{
-        
-        this->currUrl = this->rem_from_rem_path();
-        this->widget.txtBox_remotepath->setText(this->currUrl);
-    }
-    
-    //Remove all data rows
-    this->model_remote->removeRows(0, this->model_remote->rowCount());
-    
-    
-    //QMetaObject::invokeMethod(this->connection, "ssGET_FILE_LIST", Q_ARG(QString, this->currUrl));
+
 }
 
 void FMgr::eh_fileReceived(){
