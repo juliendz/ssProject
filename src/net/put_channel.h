@@ -23,7 +23,7 @@ public:
     SSH_CHANNEL_STATE 	open_channel ();
     SSH_CHANNEL_STATE 	close_channel ();
     SSH_CHANNEL_STATE 	perform_operation ();
-    Node_ex* 			currentNode;
+    exNode* 			currentNode;
     QString 				currentRemotePath;
 
 

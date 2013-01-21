@@ -252,7 +252,7 @@ void SSHSession::sftp_ls(QString path){
 
 }
 
-void SSHSession::sftp_get_ls(Node_ex_List *FILES){
+void SSHSession::sftp_get_ls(exNodeList *FILES){
 
     int prev_running_procs = this->running_procs;
 
@@ -288,7 +288,7 @@ void SSHSession::sftp_get_ls(Node_ex_List *FILES){
 
 }
 
-void SSHSession::sftp_put_ls( Node_ex_List *FILES ){
+void SSHSession::sftp_put_ls( exNodeList *FILES ){
         int prev_running_procs = this->running_procs;
         LS_Channel *channel = ( LS_Channel* )this->CHANNELS[ 0 ];
         if ( !channel ) {										//Is it instantiated ?
@@ -313,7 +313,7 @@ void SSHSession::sftp_put_ls( Node_ex_List *FILES ){
 }
 
 
-void SSHSession::sftp_get(Node_ex *file, QString currentLocalPath){
+void SSHSession::sftp_get(exNode *file, QString currentLocalPath){
 
     int prev_running_procs = this->running_procs;
     GET_Channel *channel = 0;
@@ -358,7 +358,7 @@ void SSHSession::sftp_get(Node_ex *file, QString currentLocalPath){
 
 }
 
-void SSHSession::sftp_put(Node_ex *file, QString currentRemotePath){
+void SSHSession::sftp_put( exNode *file, QString currentRemotePath){
         int prev_running_procs = this->running_procs;
         GET_Channel *channel = 0;
         int channel_index;
@@ -387,9 +387,7 @@ void SSHSession::sftp_put(Node_ex *file, QString currentRemotePath){
         }
 }
 
-LIBSSH2_SESSION *SSHSession::getSessionObject() {
-    return this->session;
-}
+LIBSSH2_SESSION *SSHSession::getSessionObject() { return this->session; }
 
 void SSHSession::process(){
 
@@ -398,6 +396,7 @@ void SSHSession::process(){
     }else{
 
          QVectorIterator <ISSHChannel*> i(this->CHANNELS);
+     int index = 0;
 
          //Process each channel
          while(i.hasNext()){
@@ -408,35 +407,29 @@ void SSHSession::process(){
             if(channel){
 
                 if(channel->state == ::CHANNEL_IDLE){
-                    fprintf(stderr, "CHANNEL_IDLE\n");
                     continue;
 
                 }else if(channel->state == ::CHANNEL_OPENING){
-                fprintf(stderr, "CHANNEL_OPENING\n");
                     channel->open_channel();
 
                 }else if(channel->state == ::CHANNEL_OPEN){
-                fprintf(stderr, "CHANNEL_OPEN\n");
                     channel->perform_operation();
 
                 }else if(channel->state == ::CHANNEL_OPEN_ERROR){
                     this->running_procs--;
 
                 }else if(channel->state == ::CHANNEL_OPERATION_INPROGRESS){
-                    //fprintf(stderr, "CHANNEL_OPERATION_INPROGRESS\n");
                     channel->perform_operation();
 
                 } else if(channel->state == ::CHANNEL_OPERATION_DONE){
-                    fprintf(stderr, "CHANNEL_OPERATION_DONE\n");
                     this->running_procs--;
                     channel->state = ::CHANNEL_IDLE;
 
                 }else if(channel->state == ::CHANNEL_OPEN_ERROR){
-                    fprintf(stderr, "CHANNEL_OPEN_ERROR\n");
                     this->running_procs--;
                 }
             }
-
+        index++;
         }
     }
 
@@ -455,11 +448,11 @@ void SSHSession::emit_receivedFileListing(QList<Node *> *LISTING){
 }
 
 //Wrapper function to emit signal
-void SSHSession::emit_receivedFileListing_ex(Node_ex_List *LISTING){
+void SSHSession::emit_receivedFileListing_ex( exNodeList *LISTING){
     emit this->receivedFileListing_ex(LISTING);
 }
 
 //Wrapper function to emit signal
-void SSHSession::emit_readyToSendFileListing( Node_ex_List *LISTING ) {
+void SSHSession::emit_readyToSendFileListing(exNodeList *LISTING ) {
     emit this->readyToSendFileListing( LISTING );
 }

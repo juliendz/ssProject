@@ -30,7 +30,7 @@ public:
     int 					list_counter;
     QString 					currentPath;
     QList<Node*>			*LISTING;
-    Node_ex_List 				*LISTING_Ex;
+    exNodeList 				*LISTING_Ex;
     SSH_LS_OPERATION		optype;
 private:
     void put_ls();

@@ -38,7 +38,7 @@ public:
 public slots:
 	//Event Handlers
     void eh_fileListReceived(QList<Node*> *FILES);
-    void eh_fileListReceived_ex(Node_ex_List *FILES);
+    void eh_fileListReceived_ex(exNodeList *FILES);
     void eh_fileReceived();
     void eh_fileUploaded(Node* file);
     void eh_upload_job_prepared(Node* file);
@@ -54,7 +54,7 @@ public slots:
 
 signals:
         void				sg_ls( QString currPath );
-    
+        void				sg_download( exNode* node, QString currLocalPath);
     
 private:
     Ui::FMgr widget;
@@ -103,7 +103,9 @@ private:
                 return "/" + this->rem_PATH.join( "/" ) + "/";
         }
 
-        QString get_curr_loc_path();
+        inline QString get_curr_loc_path( ){
+                return this->model_local->rootPath( );
+        }
 
 
     

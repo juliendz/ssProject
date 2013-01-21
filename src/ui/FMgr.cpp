@@ -29,6 +29,7 @@ FMgr::FMgr( Session* sess ) {
 
         this->sshsession = new SSHSession( this->session );	//Create the ssh session object
         connect( this, SIGNAL( sg_ls( QString ) ), this->sshsession, SLOT( sftp_ls( QString ) ) );
+        connect( this, SIGNAL( sg_download( exNode*, QString ) ), this->sshsession, SLOT( sftp_get( exNode*, QString ) ) );
         connect( this->sshsession, SIGNAL( receivedFileListing( QList<Node*>* ) ), this, SLOT( eh_fileListReceived( QList<Node*>* ) ) );
         connect( this->sshsession, SIGNAL( receivedFileListing_ex( Node_ex_List* ) ), this, SLOT( eh_fileListReceived_ex(Node_ex_List*) ) );
 
@@ -188,7 +189,7 @@ void FMgr::eh_fileListReceived( QList<Node *> *FILES ) {
         }
 }
 
-void FMgr::eh_fileListReceived_ex(Node_ex_List *FILES){
+void FMgr::eh_fileListReceived_ex(exNodeList *FILES){
 }
 
 void FMgr::eh_clicked_upload_loc_ctx_menu(){
@@ -252,12 +253,13 @@ void FMgr::eh_rem_tableViewItemDoubleClicked( const QModelIndex& index ) {
                         this->widget.txtBox_remotepath->setText( this->get_curr_rem_path ( ) );
                         this->model_remote->removeRows(0, this->model_remote->rowCount()); 	//Clear all table rows
                         emit this->sg_ls ( this->get_curr_rem_path () );
-                }else{
-                        Node_ex nx;
-                        nx.name = node->name;
-                        nx.absPath = node->absPath;
-                        nx.size = node->size;
-                        nx.type = node->type;
+                }else{														//Is file ?
+                        exNode* nx = new exNode;
+                        nx->name = node->name;
+                        nx->absPath = node->absPath;
+                        nx->size = node->size;
+                        nx->type = node->type;
+                        emit this->sg_download ( nx, this->get_curr_loc_path( ) );
                         return;
                 }
         }else{

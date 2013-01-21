@@ -157,7 +157,7 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
         if(!this->handle){
 
             //Update the current path to list
-            Node_ex* temp_node = this->LISTING_Ex->at(this->list_counter);
+            exNode* temp_node = this->LISTING_Ex->at(this->list_counter);
             if(temp_node->type == 1){
                 this->currentPath = temp_node->absPath;
             }else{
@@ -191,7 +191,7 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
 
             if(name != ".." && name != "."){
 
-                Node_ex* node = new Node_ex();
+                exNode* node = new exNode();
 
                 //PERMISSIONS and TYPE
                 if(file_attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) {
@@ -248,7 +248,7 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
 }
 
 void LS_Channel::put_ls( ) {
-        Node_ex* temp_node = this->LISTING_Ex->at(this->list_counter);        			//Get the next node in the lis
+        exNode* temp_node = this->LISTING_Ex->at(this->list_counter);        			//Get the next node in the lis
         if( temp_node->type == 1 ) { 										//is Folder
             this->currentPath = temp_node->absPath;
         }else{ 				   										// is File
@@ -261,7 +261,7 @@ void LS_Channel::put_ls( ) {
         foreach ( QFileInfo n, nodes ){
 
                 QString name = n.fileName();
-                Node_ex* node = new Node_ex();
+                exNode* node = new exNode();
                 if( n.isDir( ) ){
                     node->type = 1;
                 }else if( n.isSymLink( ) ){

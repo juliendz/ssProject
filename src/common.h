@@ -24,7 +24,7 @@ struct Node{
     }
 };
 
-struct Node_ex{
+struct exNode{
     QString name;
     QString absPath;
     short type;
@@ -32,11 +32,11 @@ struct Node_ex{
 };
 
 
-class Node_ex_List : public QList<Node_ex*>{
+class exNodeList : public QList<exNode*>{
 
 public:
-    inline Node_ex_List(){}
-    Node_ex_List(const Node_ex_List& other) {  }
+    inline exNodeList(){}
+    exNodeList(const exNodeList& other) {  }
 
 };
 

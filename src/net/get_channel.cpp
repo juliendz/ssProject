@@ -46,8 +46,7 @@ SSH_CHANNEL_STATE GET_Channel::close_channel(){
 
 
 SSH_CHANNEL_STATE GET_Channel::perform_operation(){
-    //If its a folder create it locally
-    if(this->currentNode->type == 1){
+    if(this->currentNode->type == 1){//If its a folder create it locally
         QDir dir(this->currentLocalPath + "/" + this->currentNode->name);
         if(!dir.exists()){
             dir.mkdir(this->currentLocalPath + "/" + this->currentNode->name);
@@ -90,6 +89,7 @@ SSH_CHANNEL_STATE GET_Channel::perform_operation(){
         }else{
             //Done
             this->file->close();
+            delete this->currentNode;
             this->state = ::CHANNEL_OPERATION_DONE;
         }
    }

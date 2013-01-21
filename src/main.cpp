@@ -12,8 +12,8 @@ int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
 
-    qRegisterMetaType<Node_ex_List*>("Node_ex_List*");
-    qRegisterMetaType<Node_ex*>("Node_ex*");
+    qRegisterMetaType<exNodeList*>("*exNodeList");
+    qRegisterMetaType<exNode*>("exNode*");
 
 #ifdef WIN32
     WSADATA wsadata;
