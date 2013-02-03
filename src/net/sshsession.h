@@ -67,7 +67,7 @@ public slots:
     bool end_session();
     void process();
     void sftp_ls(QString path);
-    void sftp_get_ls( exNodeList *FILES);
+    void sftp_get_ls(exNodeList *FILES, QString remCurrPath);
     void sftp_put_ls(exNodeList *FILES);
     void sftp_get(exNode* file, QString currentLocalPath);
     void sftp_put(exNode* file, QString currentRemotePath);
@@ -75,12 +75,16 @@ public slots:
 public:
     LIBSSH2_SESSION* getSessionObject();
     void emit_receivedFileListing(QList<Node*>* LISTING);
-    void emit_receivedFileListing_ex(exNodeList *LISTING);
+    void emit_getQueueReady( exNodeList *LISTING );
+    void emit_progressUpdate( exNode *node, int progress_perc );
+    void emit_getDone( exNode* node, int progress_perc );
     void emit_readyToSendFileListing(exNodeList *LISTING);
 
 signals:
-    void receivedFileListing(QList<Node*>* LISTING);
-    void receivedFileListing_ex( exNodeList *LISTING);
+    void sg_lsReady(QList<Node*>* LISTING);
+    void sg_getQueueReady( exNodeList *LISTING);
+    void sg_progressUpdate( exNode* node,  int progress_perc );
+    void sg_getDone( exNode* node,  int progress_perc );
     void readyToSendFileListing( exNodeList *LISTING );
 
 private:

@@ -126,13 +126,19 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
             //NAME
             node->name = QString(mem);
             //PATH
-            node->absPath = this->m_path +  node->name ;
+            node->absPath = this->m_path +  node->name;
+            if( node->type == 1 && ( node->name != "." || node->name != ".." ) ){
+                    node->absPath += "/";
+            }
+            int startPos = this->m_path.count( );
+            QStringRef relPath(&node->absPath, startPos, ( node->absPath.count () -  startPos ) );
+            node->relPath =  relPath.toString( );
 
-        if(node->name == "." || node->name == "..") {
-                this->LISTING->insert ( 0, node );
-        }else{
-                this->LISTING->append(node);
-        }
+            if(node->name == "." || node->name == "..") {
+                    this->LISTING->insert ( 0, node );
+            }else{
+                    this->LISTING->append(node);
+            }
 
 
         }else if(rc == LIBSSH2_ERROR_EAGAIN) {
@@ -162,6 +168,13 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
                 this->currentPath = temp_node->absPath;
             }else{
                 this->list_counter++;
+                if(this->list_counter < this->LISTING_Ex->count()){
+                    this->state = ::CHANNEL_OPERATION_INPROGRESS;
+                }else{
+                    this->state = ::CHANNEL_OPERATION_DONE;
+                    this->session->emit_getQueueReady( this->LISTING_Ex );
+                    return this->state;
+                }
                 this->state = ::CHANNEL_OPERATION_INPROGRESS;
                 return this->state;
             }
@@ -217,8 +230,13 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
 
                 //PATH
                 node->name = name;
-                node->absPath = currentPath + "/" + name ;
-
+                node->absPath = currentPath + name ;
+                if( node->type == 1 && ( node->name != "." || node->name != ".." ) ){
+                        node->absPath += "/";
+                }
+                int startPos = this->rootPath.count( );
+                QStringRef relPath(&node->absPath, startPos, ( node->absPath.count () -  startPos ) );
+                node->relPath =  relPath.toString( );
                 this->LISTING_Ex->insert(this->list_counter+1, node);
           }
 
@@ -238,7 +256,7 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
                 this->state = ::CHANNEL_OPERATION_INPROGRESS;
             }else{
                 this->state = ::CHANNEL_OPERATION_DONE;
-                this->session->emit_receivedFileListing_ex(this->LISTING_Ex);
+                this->session->emit_getQueueReady( this->LISTING_Ex );
             }
 
         }

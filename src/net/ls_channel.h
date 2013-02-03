@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QDir>
 #include <QFileInfo>
+#include <QStringRef>
 
 class SSHSession;
 
@@ -29,6 +30,7 @@ public:
     QList<QString>			*m_PATHS;
     int 					list_counter;
     QString 					currentPath;
+    QString					rootPath;
     QList<Node*>			*LISTING;
     exNodeList 				*LISTING_Ex;
     SSH_LS_OPERATION		optype;

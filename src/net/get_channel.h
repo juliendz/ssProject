@@ -7,6 +7,7 @@
 #include "sshsession.h"
 #include "../common.h"
 #include <QDebug>
+#include <QStandardItem>
 
 class SSHSession;
 

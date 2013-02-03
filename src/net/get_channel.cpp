@@ -46,34 +46,47 @@ SSH_CHANNEL_STATE GET_Channel::close_channel(){
 
 
 SSH_CHANNEL_STATE GET_Channel::perform_operation(){
-    if(this->currentNode->type == 1){//If its a folder create it locally
-        QDir dir(this->currentLocalPath + "/" + this->currentNode->name);
+
+    QString relPathWithoutName = ::GetRelativePathWithoutName ( this->currentNode->relPath, this->currentNode->name );
+    QString absPathWithoutName =  this->currentLocalPath + "/" + relPathWithoutName;
+
+    QDir parentdir( absPathWithoutName );
+    if( !parentdir.exists( ) ) { 								//Check if theh parent dir exists
+	qDebug() << 'not ready';
+	this->state = ::CHANNEL_OPERATION_INPROGRESS;
+	return this->state;									//We wait for it to be created
+    }
+
+    if(this->currentNode->type == 1){								//If its a folder create it locally
+
+        QString dirName = this->currentLocalPath + "/" + this->currentNode->relPath;
+        QDir dir( dirName );
         if(!dir.exists()){
-            dir.mkdir(this->currentLocalPath + "/" + this->currentNode->name);
+            dir.mkdir( dirName );
             this->state = ::CHANNEL_OPERATION_DONE;
+            this->session->emit_getDone ( this->currentNode, 100 );
         }
-    }else{
+    }else{											//Download the file and save it
 
         //Open the file via FTP
         if(!this->handle){
-              this->handle = libssh2_sftp_open(this->channel, this->currentNode->absPath.toUtf8().constData(),  LIBSSH2_FXF_READ, 0);
 
-              if (!this->handle && libssh2_session_last_errno(this->ssh_session) != LIBSSH2_ERROR_EAGAIN) {
-                     this->state = ::CHANNEL_OPERATION_ERROR;
-                    return this->state;
-              }
+              	this->handle = libssh2_sftp_open(this->channel, this->currentNode->absPath.toUtf8().constData(),  LIBSSH2_FXF_READ, 0);
 
-             if(!this->handle){
-                    this->state = ::CHANNEL_OPERATION_INPROGRESS;
-                    return this->state;
-             }else{
+                if (!this->handle && libssh2_session_last_errno(this->ssh_session) != LIBSSH2_ERROR_EAGAIN) {
+                         this->state = ::CHANNEL_OPERATION_ERROR;
+                        return this->state;
+                  }
 
-                this->file->setFileName(this->currentNode->name);
-                QDir::setCurrent(this->currentLocalPath);
-                this->file->open(QIODevice::WriteOnly | QIODevice::Append);
-             }
-
-        }
+                 if(!this->handle){								//Still not connected, try again
+                        this->state = ::CHANNEL_OPERATION_INPROGRESS;
+                        return this->state;
+                 }else{										//Opened, so prepare file to write
+    			this->file->setFileName(this->currentNode->name);
+        		QDir::setCurrent( absPathWithoutName );
+			this->file->open(QIODevice::WriteOnly | QIODevice::Append);
+		 }
+	}
 
         int rc = 0;
         char mem[1024*24];
@@ -83,14 +96,19 @@ SSH_CHANNEL_STATE GET_Channel::perform_operation(){
         if(rc > 0){
             //Write to file
             this->file->write(mem, rc);
+            int progress  = ( rc / this->currentNode->size ) * 100;
+            this->session->emit_progressUpdate ( this->currentNode, progress );
 
         }else if(rc == LIBSSH2_ERROR_EAGAIN){
             this->state = ::CHANNEL_OPERATION_INPROGRESS;
         }else{
             //Done
             this->file->close();
-            delete this->currentNode;
             this->state = ::CHANNEL_OPERATION_DONE;
+            delete this->currentNode;
+            libssh2_sftp_close(this->handle);
+	    this->handle = NULL;
+            this->session->emit_getDone ( this->currentNode, 100 );
         }
    }
 

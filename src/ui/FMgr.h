@@ -18,11 +18,14 @@
 #include <QSignalMapper>
 #include <QQueue>
 #include <QItemSelectionModel>
-#include "SessionsTableViewDelegate.h"
+#include "transferstableviewdelegate.h"
 #include "../common.h"
 #include "../net/sshsession.h"
 #include "../sessions/Session.h"
 #include <QTimer>
+#include <QHash>
+#include <QList>
+#include <QStandardItem>
 
 
 
@@ -37,14 +40,17 @@ public:
 
 public slots:
 	//Event Handlers
-    void eh_fileListReceived(QList<Node*> *FILES);
-    void eh_fileListReceived_ex(exNodeList *FILES);
+    void sl_lsReady(QList<Node*> *FILES);
+    void sl_getQueueReady( exNodeList *FILES );
+        void 				sl_progressUpdate( exNode *node, int progress_perc );
+        void 				sl_getDone( exNode *node, int progress_perc );
     void eh_fileReceived();
     void eh_fileUploaded(Node* file);
     void eh_upload_job_prepared(Node* file);
     void eh_logger_update(QByteArray);
 
     void eh_clicked_upload_loc_ctx_menu();
+        void 				sl_triggered_remDownloadAction( );
     void eh_rem_tableViewItemDoubleClicked(const QModelIndex& index);
     void eh_loc_tableViewItemDoubleClicked(const QModelIndex& index);
     void eh_loc_drives_cbox_changed(QString);
@@ -54,11 +60,19 @@ public slots:
 
 signals:
         void				sg_ls( QString currPath );
-        void				sg_download( exNode* node, QString currLocalPath);
-    
+        void				sg_get_ls( exNodeList* NODES, QString remCurPath);
+        void				sg_get( exNode* node, QString locCurPath );
+
 private:
     Ui::FMgr widget;
-    
+    QMenu* locaCtxlMenu;
+    QMenu* remCtxMenu;
+    TransfersTableViewDelegate* downloadsDelegate;
+    int dlQueueCount;
+    int dlQueueIndex;
+    int dlQueueCurIndex;
+    int dlQueueRunning;
+
     //Session object
     Session* session;
     
@@ -74,17 +88,24 @@ private:
     //Underlying models for the filemanagers
     QFileSystemModel* model_local;
     QStandardItemModel* model_remote;    
-    QStandardItemModel* model_uploads;    
-    QStandardItemModel* model_downloads;    
-    
+    QStandardItemModel* model_transfers_queued;
+    QStandardItemModel* model_transfers_failed;
+    QStandardItemModel* model_transfers_completed;
+
     QStringList rem_PATH;
     
     //Queues
     //QQueue<ssFileTreeNode> UPLOADS;
     //QQueue<ssFileTreeNode> DOWNLOADS;
     QList<Node *> 				*FILES;
-    
-    void setupTableView();
+    exNodeList 					*getQueue;
+    exNodeList 					*putQueue;
+    exNodeList 					*completedQueue;
+    exNodeList 					*failedQueue;
+    QHash<exNode*, QStandardItem*>		*view_transfers_model;
+
+    void 			setupTableView();
+    void 			setupCtxMenus();
     void addRow();
     
         inline void add_to_rem_path( QString dir ) {

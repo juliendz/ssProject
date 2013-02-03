@@ -14,7 +14,7 @@
 #include "../sessions/Session.h"
 #include "SessCreateForm.h"
 #include "FMgr.h"
-#include "SessionsTableViewDelegate.h"
+#include "transferstableviewdelegate.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -29,7 +29,6 @@ public:
     virtual ~MainWindow();
 private:
     Ui::MainWindow widget;
-    SessionsTableViewDelegate* colDelegate;
 
  
   };

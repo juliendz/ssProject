@@ -43,7 +43,7 @@ void SessCreateForm::saveSession(){
     SESS.insert("password", widget.txtbox_password->text());
     SESS.insert("port", widget.txtbox_port->text());
     SESS.insert("type", widget.cbox_type->currentText());
-    SESS.insert("initpath", "/home/julien/Downloads");
+    SESS.insert("initpath", "/");
     //SESS.insert("initpath", widget.txtbox_initpath->currentText());
     SessionManager::getInstance()->save(SESS);
     

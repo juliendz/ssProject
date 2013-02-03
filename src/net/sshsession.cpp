@@ -252,7 +252,7 @@ void SSHSession::sftp_ls(QString path){
 
 }
 
-void SSHSession::sftp_get_ls(exNodeList *FILES){
+void SSHSession::sftp_get_ls(exNodeList *FILES, QString remCurrPath ) {
 
     int prev_running_procs = this->running_procs;
 
@@ -274,6 +274,7 @@ void SSHSession::sftp_get_ls(exNodeList *FILES){
 
     //Set the request path
     channel->LISTING_Ex = FILES;
+    channel->rootPath = remCurrPath;
     channel->list_counter = 0;
     channel->m_path = "";
 
@@ -283,7 +284,7 @@ void SSHSession::sftp_get_ls(exNodeList *FILES){
     //Call process() only if no previously running processes
     if(prev_running_procs <= 0){
         this->timer->start(0);
-        fprintf(stderr, "TIMER STARTED\n");
+        //fprintf(stderr, "TIMER STARTED\n");
     }
 
 }
@@ -317,31 +318,33 @@ void SSHSession::sftp_get(exNode *file, QString currentLocalPath){
 
     int prev_running_procs = this->running_procs;
     GET_Channel *channel = 0;
-    int channel_index;
+    int channel_index = 2;
 
     //2-5 to be used for downloads
     for(int i=2; i < 6; i++){
-        if(!this->CHANNELS[i] || !this->CHANNELS[i]->is_open){
-            channel = (GET_Channel*)this->CHANNELS[i];
-            channel_index = i;
-            break;
+        if ( this->CHANNELS[i] ) {
+                if( this->CHANNELS[i]->state == ::CHANNEL_IDLE || this->CHANNELS[i]->state == ::CHANNEL_OPERATION_DONE ){
+                        channel = (GET_Channel*)this->CHANNELS[i];
+                        channel->state = ::CHANNEL_OPERATION_INPROGRESS;
+                        channel_index = i;
+                        break;
+                }else if ( this->CHANNELS[i]->state == ::CHANNEL_CLOSED ){    		//Is it closed ?
+                        channel = (GET_Channel*)this->CHANNELS[i];
+                        channel->state = ::CHANNEL_OPENING;
+                        channel_index = i;
+                        break;
+                }
+                channel_index++;
         }
-
     }
 
-    //Is it instantiated ?
-    if(!channel){
+    if(!channel){													//Not yet found an instantiated channel?
         channel = new GET_Channel(this);
         channel->state = ::CHANNEL_OPENING;
+    }
 
-    //Is it closed ?
-    }else if(channel->state == ::CHANNEL_CLOSED){
-        channel->state = ::CHANNEL_OPENING;
-    }
-    //Is it idle ?
-    else if(channel->state == ::CHANNEL_IDLE){
-        channel->state = ::CHANNEL_OPERATION_INPROGRESS;
-    }
+    qDebug() << "CHANNE INDEX : "+QString::number(channel_index);
+
 
     //Set the request path
     channel->currentNode = file;
@@ -353,9 +356,8 @@ void SSHSession::sftp_get(exNode *file, QString currentLocalPath){
     //Call process() only if no previously running processes
     if(prev_running_procs <= 0){
         this->timer->start(0);
-        fprintf(stderr, "TIMER STARTED\n");
     }
-
+    return;
 }
 
 void SSHSession::sftp_put( exNode *file, QString currentRemotePath){
@@ -435,7 +437,7 @@ void SSHSession::process(){
 
     if(this->running_procs <= 0){
         this->timer->stop();
-        fprintf(stderr, "TIMER STOPPED\n");
+        //fprintf(stderr, "TIMER STOPPED\n");
     }
 
 
@@ -444,15 +446,25 @@ void SSHSession::process(){
 
 //Wrapper function to emit signal
 void SSHSession::emit_receivedFileListing(QList<Node *> *LISTING){
-    emit this->receivedFileListing(LISTING);
+    emit this->sg_lsReady( LISTING );
 }
 
 //Wrapper function to emit signal
-void SSHSession::emit_receivedFileListing_ex( exNodeList *LISTING){
-    emit this->receivedFileListing_ex(LISTING);
+void SSHSession::emit_getQueueReady( exNodeList *LISTING ){
+        emit this->sg_getQueueReady( LISTING );
 }
 
 //Wrapper function to emit signal
 void SSHSession::emit_readyToSendFileListing(exNodeList *LISTING ) {
     emit this->readyToSendFileListing( LISTING );
+}
+
+//Wrapper function to emit signal
+void SSHSession::emit_progressUpdate ( exNode* node, int percent_perc ) {
+    emit this->sg_progressUpdate( node, percent_perc ) ;
+}
+
+//Wrapper function to emit signal
+void SSHSession::emit_getDone ( exNode* node, int percent_perc ) {
+    emit this->sg_getDone( node, percent_perc ) ;
 }

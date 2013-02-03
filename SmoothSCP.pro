@@ -18,12 +18,12 @@ SOURCES += \
     src/sessions/SessionManager.cpp \
     src/sessions/Session.cpp \
     src/threads/ssWorker.cpp \
-    src/ui/SessionsTableViewDelegate.cpp \
     src/ui/SessCreateForm.cpp \
     src/ui/MainWindow.cpp \
     src/ui/FMgr.cpp \
     src/logger.cpp \
-    src/net/put_channel.cpp
+    src/net/put_channel.cpp \
+    src/ui/transferstableviewdelegate.cpp
 
 HEADERS  += \
     src/common.h \
@@ -34,22 +34,25 @@ HEADERS  += \
     src/sessions/SessionManager.h \
     src/sessions/Session.h \
     src/threads/ssWorker.h \
-    src/ui/SessionsTableViewDelegate.h \
     src/ui/SessCreateForm.h \
     src/ui/MainWindow.h \
     src/ui/FMgr.h \
     src/logger.h \
-    src/net/put_channel.h
+    src/net/put_channel.h \
+    src/ui/transferstableviewdelegate.h
 
 FORMS += \
     src/ui/SessCreateForm.ui \
     src/ui/MainWindow.ui \
     src/ui/FMgr.ui
 
-win32:LIBS += -lws2_32 \
-	      -llibssh2
+win32{
+LIBS += -lws2_32 \
+        -llibssh2
+}
 
-unix:!macx:!symbian: LIBS += -L$$PWD/../../../../../usr/lib/ -lssh2
-
-INCLUDEPATH += $$PWD/../../../../../usr/include
-DEPENDPATH += $$PWD/../../../../../usr/include
+unix{
+ LIBS += -L$$PWD/../../../../../usr/lib/ -lssh2
+ INCLUDEPATH += $$PWD/../../../../../usr/include
+ DEPENDPATH += $$PWD/../../../../../usr/include
+}

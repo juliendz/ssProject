@@ -4,10 +4,12 @@
 #include <QString>
 #include <QDateTime>
 #include <QList>
+#include <QStandardItem>
 
 struct Node{
 
     QString absPath;
+    QString relPath;
     QString name;
     unsigned long size;
     int type;
@@ -27,6 +29,7 @@ struct Node{
 struct exNode{
     QString name;
     QString absPath;
+    QString relPath;
     short type;
     long size;
 };
@@ -39,6 +42,23 @@ public:
     exNodeList(const exNodeList& other) {  }
 
 };
+
+inline exNode* NodeToexNode(Node* node ){
+        exNode* n = new exNode();
+        n->absPath = node->absPath;
+        n->name = node->name;
+        n->type = node->type;
+        n->size = node->size;
+        n->relPath = node->relPath;
+        return n;
+}
+
+inline QString GetRelativePathWithoutName(QString relativePath, QString name){
+        int startPos = 0;
+        int endPos =  (relativePath.count( ) -  name.count ( ) ) - 1;
+        QStringRef relPathWithoutName(&relativePath, startPos, endPos );
+        return relPathWithoutName.toString( );
+}
 
 enum SSH_SESSION_STATE{
     SESSION_OPENING,

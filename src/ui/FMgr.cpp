@@ -15,7 +15,16 @@ FMgr::FMgr( Session* sess ) {
         this->rem_PATH = sess->initpath.split( "/" , QString::SkipEmptyParts );
         this->widget.txtBox_remotepath->setText(this->get_curr_rem_path());
 
-        setupTableView();
+        this->setupTableView();
+        this->setupCtxMenus ();
+        this->getQueue = new exNodeList( );
+        this->completedQueue = new exNodeList( );
+        this->failedQueue = new exNodeList( );
+        this->view_transfers_model = new QHash<exNode*, QStandardItem*>( );
+        this->dlQueueCount = 0;
+        this->dlQueueIndex = 0;
+        this->dlQueueCurIndex = 0;
+        this->dlQueueRunning = 0;
 
         //tableview item dclick signal/slot
         connect(this->widget.tableView_local, SIGNAL(doubleClicked(const QModelIndex&)), this, SLOT(eh_loc_tableViewItemDoubleClicked(const QModelIndex&)));
@@ -29,9 +38,12 @@ FMgr::FMgr( Session* sess ) {
 
         this->sshsession = new SSHSession( this->session );	//Create the ssh session object
         connect( this, SIGNAL( sg_ls( QString ) ), this->sshsession, SLOT( sftp_ls( QString ) ) );
-        connect( this, SIGNAL( sg_download( exNode*, QString ) ), this->sshsession, SLOT( sftp_get( exNode*, QString ) ) );
-        connect( this->sshsession, SIGNAL( receivedFileListing( QList<Node*>* ) ), this, SLOT( eh_fileListReceived( QList<Node*>* ) ) );
-        connect( this->sshsession, SIGNAL( receivedFileListing_ex( Node_ex_List* ) ), this, SLOT( eh_fileListReceived_ex(Node_ex_List*) ) );
+        connect( this->sshsession, SIGNAL( sg_lsReady( QList<Node*>* ) ), this, SLOT( sl_lsReady( QList<Node*>* ) ) );
+        connect( this, SIGNAL( sg_get_ls( exNodeList*, QString ) ), this->sshsession, SLOT( sftp_get_ls( exNodeList*, QString ) ) );
+        connect( this->sshsession, SIGNAL( sg_getQueueReady( exNodeList* ) ), this, SLOT( sl_getQueueReady( exNodeList* ) ) );
+        connect( this, SIGNAL( sg_get( exNode*, QString ) ), this->sshsession, SLOT( sftp_get( exNode*, QString ) ) );
+        connect( this->sshsession, SIGNAL( sg_progressUpdate( exNode*, int ) ), this, SLOT( sl_progressUpdate( exNode*, int ) ) );
+        connect( this->sshsession, SIGNAL( sg_getDone( exNode*,int ) ), this, SLOT( sl_getDone( exNode*, int ) ) );
 
 
         emit this->sg_ls ( this->get_curr_rem_path ( ) );
@@ -41,7 +53,6 @@ FMgr::FMgr( Session* sess ) {
 FMgr::~FMgr() {
     delete this->session;
     delete this->sshsession;
-    delete this->worker;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -75,90 +86,84 @@ void FMgr::setupTableView(){
     model_remote->setHorizontalHeaderItem(5, new QStandardItem(QString("Permissions")));
     this->widget.tableView_remote->setModel(model_remote);
 
-	//Set the model for uploads view
-    model_uploads = new QStandardItemModel(0,5,this);
-    model_uploads->setHorizontalHeaderItem(0, new QStandardItem(QString("Local File")));
-    model_uploads->setHorizontalHeaderItem(1, new QStandardItem(QString("Remote File")));
-    model_uploads->setHorizontalHeaderItem(2, new QStandardItem(QString("Size")));
-    model_uploads->setHorizontalHeaderItem(3, new QStandardItem(QString("Priority")));
-    model_uploads->setHorizontalHeaderItem(4, new QStandardItem(QString("Progress")));
-	this->widget.tableView_uploads->setModel(model_uploads);
-	this->widget.tableView_uploads->setItemDelegate(new SessionsTableViewDelegate(this));
+    //Set the model for queued transfers view
+    model_transfers_queued = new QStandardItemModel(0,6,this);
+    model_transfers_queued->setHorizontalHeaderItem(0, new QStandardItem(QString("Local File")));
+    model_transfers_queued->setHorizontalHeaderItem(1, new QStandardItem(QString("Remote File")));
+    model_transfers_queued->setHorizontalHeaderItem(2, new QStandardItem(QString("Direction")));
+    model_transfers_queued->setHorizontalHeaderItem(3, new QStandardItem(QString("Size")));
+    model_transfers_queued->setHorizontalHeaderItem(4, new QStandardItem(QString("Type")));
+    model_transfers_queued->setHorizontalHeaderItem(5, new QStandardItem(QString("Progress")));
+    this->widget.tableView_transfers_queued->setModel(model_transfers_queued);
 
 
-	//Set the model for downloads view
-    model_downloads = new QStandardItemModel(0,5,this);
-    model_downloads->setHorizontalHeaderItem(0, new QStandardItem(QString("Remote File")));
-    model_downloads->setHorizontalHeaderItem(1, new QStandardItem(QString("Local File")));
-    model_downloads->setHorizontalHeaderItem(2, new QStandardItem(QString("Size")));
-    model_downloads->setHorizontalHeaderItem(3, new QStandardItem(QString("Priority")));
-    model_downloads->setHorizontalHeaderItem(4, new QStandardItem(QString("Progress")));
-	this->widget.tableView_downloads->setModel(model_downloads);
-   
+    //Set the model for failed transfers view
+    model_transfers_failed = new QStandardItemModel(0,5,this);
+    model_transfers_failed->setHorizontalHeaderItem(0, new QStandardItem(QString("Remote File")));
+    model_transfers_failed->setHorizontalHeaderItem(1, new QStandardItem(QString("Local File")));
+    model_transfers_failed->setHorizontalHeaderItem(2, new QStandardItem(QString("Direction")));
+    model_transfers_failed->setHorizontalHeaderItem(3, new QStandardItem(QString("Size")));
+    model_transfers_failed->setHorizontalHeaderItem(4, new QStandardItem(QString("Type")));
+    model_transfers_failed->setHorizontalHeaderItem(5, new QStandardItem(QString("Progress")));
+    this->widget.tableView_transfers_failed->setModel(model_transfers_failed);
+    //this->downloadsDelegate = new TransfersTableViewDelegate( this );
+    //this->widget.tableView_downloads->setItemDelegate( this->downloadsDelegate  );
+
+    //Set the model for completed transfers view
+    model_transfers_completed = new QStandardItemModel(0,5,this);
+    model_transfers_completed->setHorizontalHeaderItem(0, new QStandardItem(QString("Remote File")));
+    model_transfers_completed->setHorizontalHeaderItem(1, new QStandardItem(QString("Local File")));
+    model_transfers_completed->setHorizontalHeaderItem(2, new QStandardItem(QString("Direction")));
+    model_transfers_completed->setHorizontalHeaderItem(3, new QStandardItem(QString("Size")));
+    model_transfers_completed->setHorizontalHeaderItem(4, new QStandardItem(QString("Type")));
+    model_transfers_completed->setHorizontalHeaderItem(5, new QStandardItem(QString("Progress")));
+    this->widget.tableView_transfers_completed->setModel(model_transfers_completed);
+
+
+}
+
+void FMgr::setupCtxMenus( ) {
+        this->locaCtxlMenu = new QMenu( this );
+        this->remCtxMenu = new QMenu( this );
+
+        QAction* locUploadAction = new QAction( "Upload", this->widget.tableView_local );
+        //act->connect(act, SIGNAL(triggered()), this, SLOT(eh_clicked_upload_loc_ctx_menu()));
+        this->locaCtxlMenu->addAction ( locUploadAction );
+        this->locaCtxlMenu->addSeparator();
+        QAction* locOpenAction = new QAction( tr( "Open" ),  this );
+        this->locaCtxlMenu->addAction ( locOpenAction );
+        QAction* locDeleteAction = new QAction( tr( "Delete" ),  this );
+        this->locaCtxlMenu->addAction ( locDeleteAction );
+        QAction* locRenameAction = new QAction( tr( "Rename" ),  this );
+        this->locaCtxlMenu->addAction ( locRenameAction );
+        this->locaCtxlMenu->addSeparator();
+        QAction* locCreateDirAction = new QAction( tr( "Create directory" ),  this );
+        this->locaCtxlMenu->addAction ( locCreateDirAction );
+        QAction* locRefreshAction = new QAction( tr(" Refresh" ),  this );
+        this->locaCtxlMenu->addAction ( locRefreshAction );
+
+        QAction* remDownloadAction = new QAction( tr( "Download" ), this );
+        remDownloadAction->connect( remDownloadAction , SIGNAL( triggered( ) ), this, SLOT( sl_triggered_remDownloadAction( ) ) );
+        this->remCtxMenu->addAction ( remDownloadAction );
+        this->remCtxMenu->addSeparator();
+        QAction* remOpenAction = new QAction( tr( "Open" ), this );
+        this->remCtxMenu->addAction ( remOpenAction );
+        QAction* remDeleteAction = new QAction( tr( "Delete" ), this );
+        this->remCtxMenu->addAction ( remDeleteAction );
+        QAction* remRenameAction = new QAction( tr( "Rename" ), this );
+        this->remCtxMenu->addAction ( remRenameAction );
+        QAction* remPermsAction = new QAction( tr( "Permissions" ), this );
+        this->remCtxMenu->addAction ( remPermsAction );
+        QAction* remRefreshAction = new QAction( tr( "Refresh" ), this );
+        this->remCtxMenu->addAction ( remRefreshAction );
 }
 
 void FMgr::showLocCtxMenu(const QPoint& pos){
-       
-        QMenu menu;
-        
-        QAction* act = menu.addAction("Upload");
-        act->connect(act, SIGNAL(triggered()), this, SLOT(eh_clicked_upload_loc_ctx_menu()));        
-        menu.addSeparator();
-        menu.addAction("Open");
-        menu.addAction("Delete");
-        menu.addAction("Rename");
-        menu.addSeparator();
-        menu.addAction("Create directory");
-        menu.addAction("Refresh");
-        menu.exec(widget.tableView_local->mapToGlobal(pos));
-
+        this->locaCtxlMenu->exec(widget.tableView_local->mapToGlobal(pos));
 }
 
 void FMgr::showRemCtxMenu(const QPoint& pos){
-    
-    //Get the clicked column
-    QModelIndex index = widget.tableView_remote->indexAt(pos); 
-    QMap<int, QVariant> data = this->model_remote->itemData(index);    
-    QString name = data[0].toString();
-    
-    //Get the sibling column from the row
-    data = this->model_remote->itemData(index.sibling(index.row(), 5));
-    QString perms = data[0].toString();
-    
-    //Is it a folder
-    if(perms.startsWith("d")){
-        
-        QString foldername = name;
-        
-        QMenu menu;
-        menu.addAction("Download directory");
-        menu.addSeparator();
-        menu.addAction("Enter");
-        menu.addAction("Delete");
-        menu.addAction("Rename");
-        menu.addAction("Permissions");
-        menu.addSeparator();
-        menu.addAction("Create directory");
-        menu.addAction("Refresh");
-        menu.exec(widget.tableView_remote->mapToGlobal(pos));
-        
-    }else{
-      
-        QString filename = name;
-        
-        QMenu menu;
-        menu.addAction("Download file");
-        menu.addSeparator();
-        menu.addAction("Open");
-        menu.addAction("Delete");
-        menu.addAction("Rename");
-        menu.addAction("Permission");
-        menu.addSeparator();
-        menu.addAction("Create directory");
-        menu.addAction("Refresh");
-        menu.exec(widget.tableView_remote->mapToGlobal(pos));
-    }
-
+        this->remCtxMenu->exec(widget.tableView_remote->mapToGlobal(pos));
 }
 
 /****************************************************************************************
@@ -174,7 +179,7 @@ void FMgr::eh_fileUploaded(Node *file){
 */
 }
 
-void FMgr::eh_fileListReceived( QList<Node *> *FILES ) {
+void FMgr::sl_lsReady( QList<Node *> *FILES ) {
         this->FILES = FILES;
         QList<Node*>::iterator iter;
         for ( iter = FILES->begin(); iter != FILES->end(); iter++ ) {    				//Update the model for the view
@@ -189,7 +194,92 @@ void FMgr::eh_fileListReceived( QList<Node *> *FILES ) {
         }
 }
 
-void FMgr::eh_fileListReceived_ex(exNodeList *FILES){
+void FMgr::sl_getQueueReady( exNodeList *FILES ){
+
+        exNodeList::iterator iter;
+        for ( iter = FILES->begin(); iter != FILES->end(); iter++ ) {    				//Update the model for the view
+
+                this->getQueue->append ( (*iter) );
+
+                QList<QStandardItem*> items;
+                items.append(  new QStandardItem( (*iter)->absPath ));
+                items.append( new QStandardItem( this->get_curr_loc_path () + "/" +  (*iter)->relPath) );
+                items.append( new QStandardItem( QString::number((*iter)->size) ) );
+                items.append( new QStandardItem( ( (*iter)->type == 0 ? "File" : ( (*iter)->type == 1 ? "Folder" : "Symlink" ) ) ) );
+                items.append( new QStandardItem( "Priority" ) );
+                QStandardItem* progItem = new QStandardItem( "Progress" );
+                items.append( progItem );
+                this->model_transfers_queued->appendRow( items );
+                this->widget.tabWidget_Transfers->setTabText( 0, "Queued (" + QString::number( this->model_transfers_queued->rowCount( ) ) + ")" );
+
+                this->view_transfers_model->insert( (*iter), progItem);
+
+
+        }
+
+        int auto_process = 1;
+        int concurrent_downloads = 1;
+        if ( auto_process ){
+                if ( this->dlQueueRunning < concurrent_downloads ) {
+                        for ( int i=this->dlQueueRunning; i < concurrent_downloads; i++ ) {
+                                this->dlQueueRunning++;
+                                emit this->sg_get( this->getQueue->at ( this->dlQueueCurIndex ), this->get_curr_loc_path ( ) );
+                                emit this->sg_get( this->getQueue->at ( this->dlQueueCurIndex ), this->get_curr_loc_path ( ) );
+                                this->dlQueueCurIndex++;
+                        }
+                }
+        }
+}
+
+void FMgr::sl_progressUpdate( exNode* node, int progress_perc ){
+        //this->downloadsDelegate->UpdateProgress( row, progress_perc );
+        QStandardItem* item = this->view_transfers_model->value( node );
+        item->setText( QString::number(progress_perc) + "%");
+        return;
+}
+
+void FMgr::sl_getDone( exNode* node, int progress_perc ){
+        //this->downloadsDelegate->UpdateProgress( row, progress_perc );
+
+        QStandardItem* item = this->view_transfers_model->value( node );
+        item->setText( QString::number(progress_perc) + "%");
+
+        this->completedQueue->append( node );							//Add the node to the completed model
+        QList<QStandardItem*> itemRow = this->model_transfers_queued->takeRow( item->row( ) );  //Extract the row from the queued table view model
+        this->model_transfers_completed->appendRow( itemRow ); 					//Add the item to the finished table view model
+
+        this->widget.tabWidget_Transfers->setTabText( 0, "Queued (" + QString::number( this->model_transfers_queued->rowCount( ) ) + ")" );
+        this->widget.tabWidget_Transfers->setTabText( 2, "Completed (" + QString::number( this->model_transfers_completed->rowCount( ) ) + ")" );
+
+        this->dlQueueRunning--;									//Decrement by one process
+
+        if ( this->dlQueueCurIndex >= ( this->getQueue->count( ) ) ) {
+                this->dlQueueCurIndex = 0;
+                this->dlQueueRunning = 0;
+                return;
+        }
+
+        int concurrent_downloads = 1;
+        for ( int i=this->dlQueueRunning; i < concurrent_downloads; i++ ) {
+                this->dlQueueRunning++;
+                emit this->sg_get( this->getQueue->at ( this->dlQueueCurIndex ), this->get_curr_loc_path ( ) );
+                this->dlQueueCurIndex++;
+         }
+
+    qDebug() << QString::number(this->dlQueueCurIndex);
+}
+
+
+void FMgr::sl_triggered_remDownloadAction( ) {
+
+        QItemSelectionModel* selections = widget.tableView_remote->selectionModel();		//Get all the current selections
+        QModelIndexList selectedIndices = selections->selectedRows ();
+        exNodeList* NODES = new exNodeList( );
+        foreach ( QModelIndex index, selectedIndices ) {
+                exNode* node = ::NodeToexNode( this->FILES->at( index.row( ) ) );
+                NODES->append( node );
+        }
+        emit this->sg_get_ls ( NODES, this->get_curr_rem_path( ) );
 }
 
 void FMgr::eh_clicked_upload_loc_ctx_menu(){
@@ -243,6 +333,7 @@ void FMgr::eh_loc_tableViewItemDoubleClicked(const QModelIndex& index){
 }
 
 void FMgr::eh_rem_tableViewItemDoubleClicked( const QModelIndex& index ) {
+
         QModelIndex ind(index.model( )->index (index.row(), 0, index.parent( ) ) );			//Get the index of the selected row's first column
         QString node_name = ind.data( ).toString( );									//Get the value in the name column
 
@@ -254,12 +345,10 @@ void FMgr::eh_rem_tableViewItemDoubleClicked( const QModelIndex& index ) {
                         this->model_remote->removeRows(0, this->model_remote->rowCount()); 	//Clear all table rows
                         emit this->sg_ls ( this->get_curr_rem_path () );
                 }else{														//Is file ?
-                        exNode* nx = new exNode;
-                        nx->name = node->name;
-                        nx->absPath = node->absPath;
-                        nx->size = node->size;
-                        nx->type = node->type;
-                        emit this->sg_download ( nx, this->get_curr_loc_path( ) );
+                        exNodeList* nsList = new exNodeList();
+                        exNode* nx = ::NodeToexNode ( node );
+                        nsList->append (nx);
+                        emit this->sg_get_ls ( nsList, this->get_curr_rem_path( ) );
                         return;
                 }
         }else{
