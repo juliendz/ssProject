@@ -8,6 +8,8 @@ LS_Channel::LS_Channel(SSHSession *session){
     this->ssh_session = session->getSessionObject();
     this->channel = 0;
     this->handle = 0;
+    this->list_counter = 0;
+    this->prev_list_counter = -1;
 
     this->LISTING = new QList<Node*>();
 
@@ -164,6 +166,12 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
 
             //Update the current path to list
             exNode* temp_node = this->LISTING_Ex->at(this->list_counter);
+
+            if( this->list_counter > this->prev_list_counter ){					//Only send the node if its a new one
+                this->session->emit_getQueueNode( temp_node );
+                this->prev_list_counter = this->list_counter;
+            }
+
             if(temp_node->type == 1){
                 this->currentPath = temp_node->absPath;
             }else{
@@ -172,7 +180,8 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
                     this->state = ::CHANNEL_OPERATION_INPROGRESS;
                 }else{
                     this->state = ::CHANNEL_OPERATION_DONE;
-                    this->session->emit_getQueueReady( this->LISTING_Ex );
+                    this->list_counter = 0;
+                    this->prev_list_counter = -1;
                     return this->state;
                 }
                 this->state = ::CHANNEL_OPERATION_INPROGRESS;
@@ -256,7 +265,8 @@ SSH_CHANNEL_STATE LS_Channel::perform_operation(){
                 this->state = ::CHANNEL_OPERATION_INPROGRESS;
             }else{
                 this->state = ::CHANNEL_OPERATION_DONE;
-                this->session->emit_getQueueReady( this->LISTING_Ex );
+                this->list_counter = 0;
+                this->prev_list_counter = -1;
             }
 
         }

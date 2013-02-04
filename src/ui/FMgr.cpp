@@ -40,7 +40,7 @@ FMgr::FMgr( Session* sess ) {
         connect( this, SIGNAL( sg_ls( QString ) ), this->sshsession, SLOT( sftp_ls( QString ) ) );
         connect( this->sshsession, SIGNAL( sg_lsReady( QList<Node*>* ) ), this, SLOT( sl_lsReady( QList<Node*>* ) ) );
         connect( this, SIGNAL( sg_get_ls( exNodeList*, QString ) ), this->sshsession, SLOT( sftp_get_ls( exNodeList*, QString ) ) );
-        connect( this->sshsession, SIGNAL( sg_getQueueReady( exNodeList* ) ), this, SLOT( sl_getQueueReady( exNodeList* ) ) );
+        connect( this->sshsession, SIGNAL( sg_getQueueNode( exNode* ) ), this, SLOT( sl_getQueueNode( exNode* ) ), Qt::QueuedConnection );
         connect( this, SIGNAL( sg_get( exNode*, QString ) ), this->sshsession, SLOT( sftp_get( exNode*, QString ) ) );
         connect( this->sshsession, SIGNAL( sg_progressUpdate( exNode*, int ) ), this, SLOT( sl_progressUpdate( exNode*, int ) ) );
         connect( this->sshsession, SIGNAL( sg_getDone( exNode*,int ) ), this, SLOT( sl_getDone( exNode*, int ) ) );
@@ -194,28 +194,23 @@ void FMgr::sl_lsReady( QList<Node *> *FILES ) {
         }
 }
 
-void FMgr::sl_getQueueReady( exNodeList *FILES ){
+void FMgr::sl_getQueueNode( exNode *node ){
 
-        exNodeList::iterator iter;
-        for ( iter = FILES->begin(); iter != FILES->end(); iter++ ) {    				//Update the model for the view
+        this->getQueue->append( node );
 
-                this->getQueue->append ( (*iter) );
+        QList<QStandardItem*> items;
+        items.append(  new QStandardItem( node->absPath ));
+        items.append( new QStandardItem( this->get_curr_loc_path () + "/" +  node->relPath) );
+        items.append( new QStandardItem( QString::number( node->size ) ) );
+        items.append( new QStandardItem( ( node->type == 0 ? "File" : ( node->type == 1 ? "Folder" : "Symlink" ) ) ) );
+        items.append( new QStandardItem( "Priority" ) );
+        QStandardItem* progItem = new QStandardItem( "Progress" );
+        items.append( progItem );
+        this->model_transfers_queued->appendRow( items );
+        this->widget.tabWidget_Transfers->setTabText( 0, "Queued (" + QString::number( this->model_transfers_queued->rowCount( ) ) + ")" );
 
-                QList<QStandardItem*> items;
-                items.append(  new QStandardItem( (*iter)->absPath ));
-                items.append( new QStandardItem( this->get_curr_loc_path () + "/" +  (*iter)->relPath) );
-                items.append( new QStandardItem( QString::number((*iter)->size) ) );
-                items.append( new QStandardItem( ( (*iter)->type == 0 ? "File" : ( (*iter)->type == 1 ? "Folder" : "Symlink" ) ) ) );
-                items.append( new QStandardItem( "Priority" ) );
-                QStandardItem* progItem = new QStandardItem( "Progress" );
-                items.append( progItem );
-                this->model_transfers_queued->appendRow( items );
-                this->widget.tabWidget_Transfers->setTabText( 0, "Queued (" + QString::number( this->model_transfers_queued->rowCount( ) ) + ")" );
+        this->view_transfers_model->insert( node, progItem);
 
-                this->view_transfers_model->insert( (*iter), progItem);
-
-
-        }
 
         int auto_process = 1;
         int concurrent_downloads = 1;
@@ -224,7 +219,6 @@ void FMgr::sl_getQueueReady( exNodeList *FILES ){
                         for ( int i=this->dlQueueRunning; i < concurrent_downloads; i++ ) {
                                 this->dlQueueRunning++;
                                 emit this->sg_get( this->getQueue->at ( this->dlQueueCurIndex ), this->get_curr_loc_path ( ) );
-                                emit this->sg_get( this->getQueue->at ( this->dlQueueCurIndex ), this->get_curr_loc_path ( ) );
                                 this->dlQueueCurIndex++;
                         }
                 }
@@ -232,14 +226,13 @@ void FMgr::sl_getQueueReady( exNodeList *FILES ){
 }
 
 void FMgr::sl_progressUpdate( exNode* node, int progress_perc ){
-        //this->downloadsDelegate->UpdateProgress( row, progress_perc );
+
         QStandardItem* item = this->view_transfers_model->value( node );
         item->setText( QString::number(progress_perc) + "%");
         return;
 }
 
 void FMgr::sl_getDone( exNode* node, int progress_perc ){
-        //this->downloadsDelegate->UpdateProgress( row, progress_perc );
 
         QStandardItem* item = this->view_transfers_model->value( node );
         item->setText( QString::number(progress_perc) + "%");
@@ -248,14 +241,15 @@ void FMgr::sl_getDone( exNode* node, int progress_perc ){
         QList<QStandardItem*> itemRow = this->model_transfers_queued->takeRow( item->row( ) );  //Extract the row from the queued table view model
         this->model_transfers_completed->appendRow( itemRow ); 					//Add the item to the finished table view model
 
-        this->widget.tabWidget_Transfers->setTabText( 0, "Queued (" + QString::number( this->model_transfers_queued->rowCount( ) ) + ")" );
-        this->widget.tabWidget_Transfers->setTabText( 2, "Completed (" + QString::number( this->model_transfers_completed->rowCount( ) ) + ")" );
+        this->widget.tabWidget_Transfers->setTabText( 0, tr( "Queued (" ) + QString::number( this->model_transfers_queued->rowCount( ) ) + ")" );
+        this->widget.tabWidget_Transfers->setTabText( 2, tr( "Completed (" ) + QString::number( this->model_transfers_completed->rowCount( ) ) + ")" );
 
         this->dlQueueRunning--;									//Decrement by one process
 
-        if ( this->dlQueueCurIndex >= ( this->getQueue->count( ) ) ) {
-                this->dlQueueCurIndex = 0;
+        if ( this->dlQueueCurIndex >= ( this->getQueue->count( ) ) ) {				//Is the queue over ?
+                this->dlQueueCurIndex = 0;							//Reset the counters
                 this->dlQueueRunning = 0;
+                this->getQueue->clear( );							//Clear the queue model
                 return;
         }
 
@@ -265,8 +259,6 @@ void FMgr::sl_getDone( exNode* node, int progress_perc ){
                 emit this->sg_get( this->getQueue->at ( this->dlQueueCurIndex ), this->get_curr_loc_path ( ) );
                 this->dlQueueCurIndex++;
          }
-
-    qDebug() << QString::number(this->dlQueueCurIndex);
 }
 
 

@@ -41,7 +41,7 @@ public:
 public slots:
 	//Event Handlers
     void sl_lsReady(QList<Node*> *FILES);
-    void sl_getQueueReady( exNodeList *FILES );
+    void sl_getQueueNode(exNode *node );
         void 				sl_progressUpdate( exNode *node, int progress_perc );
         void 				sl_getDone( exNode *node, int progress_perc );
     void eh_fileReceived();

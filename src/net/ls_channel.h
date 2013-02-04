@@ -29,6 +29,7 @@ public:
     QString				        m_path;
     QList<QString>			*m_PATHS;
     int 					list_counter;
+    int 					prev_list_counter;
     QString 					currentPath;
     QString					rootPath;
     QList<Node*>			*LISTING;

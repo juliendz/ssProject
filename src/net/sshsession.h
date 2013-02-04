@@ -75,14 +75,14 @@ public slots:
 public:
     LIBSSH2_SESSION* getSessionObject();
     void emit_receivedFileListing(QList<Node*>* LISTING);
-    void emit_getQueueReady( exNodeList *LISTING );
+    void emit_getQueueNode( exNode *node );
     void emit_progressUpdate( exNode *node, int progress_perc );
     void emit_getDone( exNode* node, int progress_perc );
     void emit_readyToSendFileListing(exNodeList *LISTING);
 
 signals:
     void sg_lsReady(QList<Node*>* LISTING);
-    void sg_getQueueReady( exNodeList *LISTING);
+    void sg_getQueueNode( exNode *node);
     void sg_progressUpdate( exNode* node,  int progress_perc );
     void sg_getDone( exNode* node,  int progress_perc );
     void readyToSendFileListing( exNodeList *LISTING );

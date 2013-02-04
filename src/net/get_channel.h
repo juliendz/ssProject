@@ -32,6 +32,7 @@ private:
     LIBSSH2_SFTP *channel;
     LIBSSH2_SFTP_HANDLE *handle;
     QFile* file;
+    int recv_bytes;
 
     
 public slots:

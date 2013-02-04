@@ -8,6 +8,7 @@ GET_Channel::GET_Channel(SSHSession *session){
     this->ssh_session = session->getSessionObject();
     this->channel = 0;
     this->handle = 0;
+    this->recv_bytes = 0;
 
     this->file = new QFile();
 
@@ -52,7 +53,6 @@ SSH_CHANNEL_STATE GET_Channel::perform_operation(){
 
     QDir parentdir( absPathWithoutName );
     if( !parentdir.exists( ) ) { 								//Check if theh parent dir exists
-	qDebug() << 'not ready';
 	this->state = ::CHANNEL_OPERATION_INPROGRESS;
 	return this->state;									//We wait for it to be created
     }
@@ -96,8 +96,9 @@ SSH_CHANNEL_STATE GET_Channel::perform_operation(){
         if(rc > 0){
             //Write to file
             this->file->write(mem, rc);
-            int progress  = ( rc / this->currentNode->size ) * 100;
-            this->session->emit_progressUpdate ( this->currentNode, progress );
+            this->recv_bytes += rc;
+            int progress  = ( int )( ( (double)this->recv_bytes / (double)this->currentNode->size ) * 100 );
+            this->session->emit_progressUpdate ( this->currentNode, (int)progress );
 
         }else if(rc == LIBSSH2_ERROR_EAGAIN){
             this->state = ::CHANNEL_OPERATION_INPROGRESS;
@@ -107,7 +108,8 @@ SSH_CHANNEL_STATE GET_Channel::perform_operation(){
             this->state = ::CHANNEL_OPERATION_DONE;
             delete this->currentNode;
             libssh2_sftp_close(this->handle);
-	    this->handle = NULL;
+            this->handle = NULL;
+            this->recv_bytes = 0;
             this->session->emit_getDone ( this->currentNode, 100 );
         }
    }

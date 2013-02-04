@@ -450,8 +450,8 @@ void SSHSession::emit_receivedFileListing(QList<Node *> *LISTING){
 }
 
 //Wrapper function to emit signal
-void SSHSession::emit_getQueueReady( exNodeList *LISTING ){
-        emit this->sg_getQueueReady( LISTING );
+void SSHSession::emit_getQueueNode( exNode *node ){
+        emit this->sg_getQueueNode( node );
 }
 
 //Wrapper function to emit signal
